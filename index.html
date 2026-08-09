@@ -2,30 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProTrader Journal</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <style>
-        /* CSS styles here */
-    </style>
-<script>
-  const supabaseUrl = 'https://dxmqhlqhyuguktemboge.supabase.co';
-  const supabaseKey = 'sb_publishable_FU0P1GHawzVQt2JeE5dX7Q_whfLaCDP';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-  });
-  if (error) console.error('Error logging in:', error.message);
-}
-</script>
-<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProTrader Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
@@ -257,26 +238,12 @@ async function signInWithGoogle() {
     tbody td::before{content:attr(data-label);color:var(--muted);font-family:'Inter',sans-serif;font-size:11px;font-weight:500;}
   }
 </style>
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyAHWRGxSgax0S1yMTwMKt4xy9CbLO1BOQs",
-    authDomain: "risk-1-af74c.firebaseapp.com",
-    projectId: "risk-1-af74c",
-    storageBucket: "risk-1-af74c.firebasestorage.app",
-    messagingSenderId: "540546785583",
-    appId: "1:540546785583:web:f1b3e823ae314d039a41da",
-    measurementId: "G-DP0FBF3CL7"
-  };
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
+<script>
+  // Supabase client (used for auth + data persistence)
+  var sbClient = window.supabase.createClient(
+    'https://dxmqhlqhyuguktemboge.supabase.co',
+    'sb_publishable_FU0P1GHawzVQt2JeE5dX7Q_whfLaCDP'
+  );
 </script>
 </head>
 <body>
@@ -1225,28 +1192,8 @@ async function signInWithGoogle() {
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  getFirestore, doc, getDoc, setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyB-epMCScuoVCIInaeLnbu2vKBCMrThHFI",
-  authDomain: "risk1-a75b6.firebaseapp.com",
-  projectId: "risk1-a75b6",
-  storageBucket: "risk1-a75b6.firebasestorage.app",
-  messagingSenderId: "164126821748",
-  appId: "1:164126821748:web:e77060383e4ea98d90f021",
-  measurementId: "G-Z2B16W6D95"
-};
-const fbApp = initializeApp(firebaseConfig);
-const fbAuth = getAuth(fbApp);
-const db = getFirestore(fbApp);
+<script>
+// Auth + data persistence now run on Supabase (sbClient is created in <head>).
 
 (function(){
   const $ = id => document.getElementById(id);
@@ -1332,18 +1279,14 @@ const db = getFirestore(fbApp);
   }
 
   // ============================================================
-  // CLOUD PERSISTENCE (Firestore, keyed by signed-in user)
+  // CLOUD PERSISTENCE (Supabase table "journals", keyed by signed-in user)
   // ============================================================
-  function journalRef(){
-    return doc(db,'journals',currentUid);
-  }
-
   async function loadData(){
     if(!currentUid)return;
     try{
-      const snap=await getDoc(journalRef());
-      if(snap.exists()){
-        const data=snap.data();
+      const {data,error}=await sbClient.from('journals').select('settings,trades').eq('user_id',currentUid).maybeSingle();
+      if(error)throw error;
+      if(data){
         if(data.settings)settings=data.settings;
         if(data.trades)trades=data.trades;
       }
@@ -1356,8 +1299,10 @@ const db = getFirestore(fbApp);
 
   async function save(){
     if(!currentUid)return;
-    try{await setDoc(journalRef(),{settings,trades},{merge:true});}
-    catch(e){toast('Cloud save error');}
+    try{
+      const {error}=await sbClient.from('journals').upsert({user_id:currentUid,settings,trades},{onConflict:'user_id'});
+      if(error)throw error;
+    }catch(e){toast('Cloud save error');}
   }
 
   function hydrateSettings(){
@@ -2316,26 +2261,22 @@ const db = getFirestore(fbApp);
   // ============================================================
   let crosses=[];
 
-  function crossRef(){
-    return doc(db,'journals',currentUid);
-  }
-
   async function loadCrosses(){
     if(!currentUid)return;
     try{
-      const snap=await getDoc(crossRef());
-      if(snap.exists()){
-        const data=snap.data();
-        if(data.crosses)crosses=data.crosses;
-      }
+      const {data,error}=await sbClient.from('journals').select('crosses').eq('user_id',currentUid).maybeSingle();
+      if(error)throw error;
+      if(data&&data.crosses)crosses=data.crosses;
     }catch(e){crosses=[];}
     renderCrosses();
   }
 
   async function saveCrosses(){
     if(!currentUid)return;
-    try{await setDoc(crossRef(),{crosses},{merge:true});}
-    catch(e){toast('Cross save error');}
+    try{
+      const {error}=await sbClient.from('journals').upsert({user_id:currentUid,crosses},{onConflict:'user_id'});
+      if(error)throw error;
+    }catch(e){toast('Cross save error');}
   }
 
   function computeCrossDay(dateStr){
@@ -2608,18 +2549,14 @@ const db = getFirestore(fbApp);
   let capitalAccounts=[]; // {id,name,startBal,balance,riskPct,history:[{id,type,date,note,amount,symbol,result,balanceAfter}]}
   let activeCapAccountId=null;
 
-  function capRef(){
-    return doc(db,'journals',currentUid);
-  }
-
   async function loadCapital(){
     if(!currentUid)return;
     try{
-      const snap=await getDoc(capRef());
-      if(snap.exists()){
-        const data=snap.data();
-        capitalAccounts=data.capitalAccounts||[];
-        activeCapAccountId=data.activeCapAccountId||(capitalAccounts[0]?capitalAccounts[0].id:null);
+      const {data,error}=await sbClient.from('journals').select('capital_accounts,active_cap_account_id').eq('user_id',currentUid).maybeSingle();
+      if(error)throw error;
+      if(data){
+        capitalAccounts=data.capital_accounts||[];
+        activeCapAccountId=data.active_cap_account_id||(capitalAccounts[0]?capitalAccounts[0].id:null);
       }
     }catch(e){capitalAccounts=[];}
     if(!capitalAccounts.length){
@@ -2638,8 +2575,10 @@ const db = getFirestore(fbApp);
 
   async function saveCapital(){
     if(!currentUid)return;
-    try{await setDoc(capRef(),{capitalAccounts,activeCapAccountId},{merge:true});}
-    catch(e){toast('Account save error');}
+    try{
+      const {error}=await sbClient.from('journals').upsert({user_id:currentUid,capital_accounts:capitalAccounts,active_cap_account_id:activeCapAccountId},{onConflict:'user_id'});
+      if(error)throw error;
+    }catch(e){toast('Account save error');}
   }
 
   function getActiveCapAccount(){
@@ -2889,13 +2828,13 @@ const db = getFirestore(fbApp);
   }
 
   function friendlyAuthError(e){
-    const code=e&&e.code||'';
-    if(code.includes('wrong-password')||code.includes('invalid-credential'))return'Incorrect email or password.';
-    if(code.includes('user-not-found'))return'No account found with that email.';
-    if(code.includes('email-already-in-use'))return'An account already exists with that email — try signing in instead.';
-    if(code.includes('weak-password'))return'Password should be at least 6 characters.';
-    if(code.includes('invalid-email'))return'Enter a valid email address.';
-    return e&&e.message?e.message:'Something went wrong. Please try again.';
+    const msg=(e&&e.message)||'';
+    const m=msg.toLowerCase();
+    if(m.includes('invalid login credentials'))return'Incorrect email or password.';
+    if(m.includes('already registered')||m.includes('already exists'))return'An account already exists with that email — try signing in instead.';
+    if(m.includes('password should be at least'))return'Password should be at least 6 characters.';
+    if(m.includes('unable to validate email')||m.includes('invalid email'))return'Enter a valid email address.';
+    return msg||'Something went wrong. Please try again.';
   }
 
   $('btnSignIn').addEventListener('click',async()=>{
@@ -2904,7 +2843,8 @@ const db = getFirestore(fbApp);
     const pw=$('authPassword').value;
     if(!email||!pw){authErr('Enter your email and password.');return;}
     try{
-      await signInWithEmailAndPassword(fbAuth,email,pw);
+      const {error}=await sbClient.auth.signInWithPassword({email,password:pw});
+      if(error)throw error;
     }catch(e){authErr(friendlyAuthError(e));}
   });
 
@@ -2915,14 +2855,16 @@ const db = getFirestore(fbApp);
     if(!email||!pw){authErr('Enter an email and password to create an account.');return;}
     if(pw.length<6){authErr('Password should be at least 6 characters.');return;}
     try{
-      await createUserWithEmailAndPassword(fbAuth,email,pw);
+      const {error}=await sbClient.auth.signUp({email,password:pw});
+      if(error)throw error;
     }catch(e){authErr(friendlyAuthError(e));}
   });
 
   $('btnGoogleSignIn').addEventListener('click',async()=>{
     clearAuthErr();
     try{
-      await signInWithPopup(fbAuth,new GoogleAuthProvider());
+      const {error}=await sbClient.auth.signInWithOAuth({provider:'google'});
+      if(error)throw error;
     }catch(e){authErr(friendlyAuthError(e));}
   });
 
@@ -2931,27 +2873,34 @@ const db = getFirestore(fbApp);
     const email=$('authEmail').value.trim();
     if(!email){authErr('Enter your email above first, then tap this button.');return;}
     try{
-      await sendPasswordResetEmail(fbAuth,email);
+      const {error}=await sbClient.auth.resetPasswordForEmail(email);
+      if(error)throw error;
       toast('Password reset email sent');
     }catch(e){authErr(friendlyAuthError(e));}
   });
 
   $('btnSignOut').addEventListener('click',async()=>{
-    await signOut(fbAuth);
+    await sbClient.auth.signOut();
   });
 
-  onAuthStateChanged(fbAuth,async(user)=>{
+  let dataLoadedForUid=null;
+  sbClient.auth.onAuthStateChange(async(_event,session)=>{
+    const user=session&&session.user;
     if(user){
-      currentUid=user.uid;
+      currentUid=user.id;
       $('hdrUserEmail').textContent=user.email||'Signed in';
       $('authEmail').value='';$('authPassword').value='';
       clearAuthErr();
       showApp();
-      await loadData();
-      await loadCrosses();
-      await loadCapital();
+      if(dataLoadedForUid!==currentUid){
+        dataLoadedForUid=currentUid;
+        await loadData();
+        await loadCrosses();
+        await loadCapital();
+      }
     } else {
       currentUid=null;
+      dataLoadedForUid=null;
       showAuthScreen();
     }
   });
